@@ -7,7 +7,15 @@ import pytest
 from synapse_ws.server import app
 from synapse_ws.client import call_server_function
 
-def _wait_for_port(host: str, port: int, timeout: float = 15.0, interval: float = 0.1) -> bool:
+
+def find_free_port() -> int:
+    """Acquire a free TCP port from the OS and return it."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+def _wait_for_port(host: str, port: int, timeout: float = 20.0, interval: float = 0.1) -> bool:
     """
     Poll until a TCP connection to (host, port) succeeds or timeout is reached.
     Returns True if port became connectable, False otherwise.
@@ -26,22 +34,30 @@ def _wait_for_port(host: str, port: int, timeout: float = 15.0, interval: float 
 
 @pytest.mark.asyncio
 async def test_e2e():
-    # Start uvicorn in a background thread
+    port = find_free_port()
+
+    # Start uvicorn in a background daemon thread and handle SystemExit gracefully
     def run_server():
-        # Using uvicorn.run is fine for tests; it will block the thread but not the test thread.
-        uvicorn.run(app, host="127.0.0.1", port=8000, log_level="warning")
+        try:
+            uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")
+        except SystemExit:
+            # uvicorn may call sys.exit() internally on error; swallow it here
+            return
+        except Exception:
+            # In case of other exceptions, avoid propagating to test runner thread
+            return
 
     t = threading.Thread(target=run_server, daemon=True)
     t.start()
 
     # Wait for the TCP port to be ready (robust on CI)
-    ready = _wait_for_port("127.0.0.1", 8000, timeout=20.0, interval=0.1)
-    assert ready, "Server did not become ready in time"
+    ready = _wait_for_port("127.0.0.1", port, timeout=20.0, interval=0.1)
+    assert ready, f"Server did not become ready on port {port} in time"
 
-    # give FastAPI a brief moment to finish internal startup if necessary
-    await asyncio.sleep(0.2)
+    # short stable delay to let FastAPI finish internal startup
+    await asyncio.sleep(0.1)
 
-    # Use a longer timeout for the RPC call so slow CI hosts don't cause a test failure
-    res = await call_server_function("add_numbers", [4, 5], url="ws://127.0.0.1:8000/ws", timeout=15.0)
+    # Use a longer RPC timeout so slow CI hosts don't cause a failure
+    ws_url = f"ws://127.0.0.1:{port}/ws"
+    res = await call_server_function("add_numbers", [4, 5], url=ws_url, timeout=15.0)
     assert res == 9
-    # Note: The server thread will be killed when the test process exits.
