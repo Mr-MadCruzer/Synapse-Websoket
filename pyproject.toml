@@ -1,22 +1,33 @@
 [tool.poetry]
 name = "synapse-ws-exercise"
 version = "0.1.0"
-description = "WebSocket client-server exercise (Synapse)"
-authors = ["Synapse <synapse@gmail.com>"]
+description = "WebSocket client-server exercise"
 readme = "README.md"
-packages = [{ include = "synapse_ws", from = "src" }]
+authors = ["Synapse <synapse@gmail.com>"]
+
+# Your source code is inside: src/synapse_ws
+packages = [
+    { include = "synapse_ws", from = "src" }
+]
 
 [tool.poetry.dependencies]
 python = ">=3.10"
-fastapi = "^0.95"
-uvicorn = {extras=["standard"], version = "^0.22"}
+
+# FastAPI ≥ 0.100 added Pydantic v2 support
+fastapi = ">=0.100.0,<0.120.0"
+
+# Uvicorn compatible with FastAPI & Python 3.13
+uvicorn = { extras = ["standard"], version = "^0.22" }
+
 websockets = "^11.0"
+
+# Pydantic v2 (what your code uses)
 pydantic = "^2.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.0"
 pytest-asyncio = "^0.21"
-ruff = "^0.13.0"
+ruff = "^0.3.0"
 black = "^23.1.0"
 
 [build-system]

@@ -11,7 +11,13 @@ app = FastAPI(title="Synapse WS Exercise")
 # -------------------------
 def add_numbers(a: float, b: float) -> float:
     """Return sum of two numbers."""
-    return a + b
+    try:
+
+        return a + b
+    
+    except TypeError:
+        
+        raise ValueError("Both arguments must be numbers.")
 
 
 # Function registry
